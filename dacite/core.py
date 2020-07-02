@@ -5,6 +5,7 @@ from typing import TypeVar, Type, Optional, get_type_hints, Mapping, Any
 from dacite.config import Config
 from dacite.data import Data
 from dacite.dataclasses import get_default_value_for_field, create_instance, DefaultValueNotFoundError, get_fields
+from dacite.schema import _get_mapped_data_and_schema, SchemaMapping
 from dacite.exceptions import (
     ForwardReferenceError,
     WrongTypeError,
@@ -28,7 +29,7 @@ from dacite.types import (
 T = TypeVar("T")
 
 
-def from_dict(data_class: Type[T], data: Data, config: Optional[Config] = None) -> T:
+def from_dict(data_class: Type[T], data: Data, config: Optional[Config] = None, schema: SchemaMapping = None) -> T:
     """Create a data class instance from a dictionary.
 
     :param data_class: a data class type
@@ -53,11 +54,11 @@ def from_dict(data_class: Type[T], data: Data, config: Optional[Config] = None) 
         field.type = data_class_hints[field.name]
         try:
             try:
-                field_data = data[field.name]
+                field_data, value_schema = _get_mapped_data_and_schema(data_class, field, data, schema)
                 transformed_value = transform_value(
                     type_hooks=config.type_hooks, cast=config.cast, target_type=field.type, value=field_data
                 )
-                value = _build_value(type_=field.type, data=transformed_value, config=config)
+                value = _build_value(type_=field.type, data=transformed_value, config=config, schema=value_schema)
             except DaciteFieldError as error:
                 error.update_path(field.name)
                 raise
@@ -78,20 +79,20 @@ def from_dict(data_class: Type[T], data: Data, config: Optional[Config] = None) 
     return create_instance(data_class=data_class, init_values=init_values, post_init_values=post_init_values)
 
 
-def _build_value(type_: Type, data: Any, config: Config) -> Any:
+def _build_value(type_: Type, data: Any, config: Config, schema: SchemaMapping = None) -> Any:
     if is_union(type_):
-        return _build_value_for_union(union=type_, data=data, config=config)
+        return _build_value_for_union(union=type_, data=data, config=config, schema=schema)
     elif is_generic_collection(type_) and is_instance(data, extract_origin_collection(type_)):
-        return _build_value_for_collection(collection=type_, data=data, config=config)
+        return _build_value_for_collection(collection=type_, data=data, config=config, schema=schema)
     elif is_dataclass(type_) and is_instance(data, Data):
-        return from_dict(data_class=type_, data=data, config=config)
+        return from_dict(data_class=type_, data=data, config=config, schema=schema)
     return data
 
 
-def _build_value_for_union(union: Type, data: Any, config: Config) -> Any:
+def _build_value_for_union(union: Type, data: Any, config: Config, schema: SchemaMapping = None) -> Any:
     types = extract_generic(union)
     if is_optional(union) and len(types) == 2:
-        return _build_value(type_=types[0], data=data, config=config)
+        return _build_value(type_=types[0], data=data, config=config, schema=schema)
     union_matches = {}
     for inner_type in types:
         try:
@@ -102,7 +103,7 @@ def _build_value_for_union(union: Type, data: Any, config: Config) -> Any:
                 )
             except Exception:  # pylint: disable=broad-except
                 continue
-            value = _build_value(type_=inner_type, data=data, config=config)
+            value = _build_value(type_=inner_type, data=data, config=config, schema=schema)
             if is_instance(value, inner_type):
                 if config.strict_unions_match:
                     union_matches[inner_type] = value
@@ -119,10 +120,10 @@ def _build_value_for_union(union: Type, data: Any, config: Config) -> Any:
     raise UnionMatchError(field_type=union, value=data)
 
 
-def _build_value_for_collection(collection: Type, data: Any, config: Config) -> Any:
+def _build_value_for_collection(collection: Type, data: Any, config: Config, schema: SchemaMapping = None) -> Any:
     if is_instance(data, Mapping):
         return data.__class__(
-            (key, _build_value(type_=extract_generic(collection)[1], data=value, config=config))
+            (key, _build_value(type_=extract_generic(collection)[1], data=value, config=config, schema=schema))
             for key, value in data.items()
         )
-    return data.__class__(_build_value(type_=extract_generic(collection)[0], data=item, config=config) for item in data)
+    return data.__class__(_build_value(type_=extract_generic(collection)[0], data=item, config=config, schema=schema) for item in data)

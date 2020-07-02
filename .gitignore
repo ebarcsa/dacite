@@ -3,3 +3,11 @@
 dist/
 *.egg-info/
 build/
+
+dacite-env
+.mypy_cache
+.vscode
+.env
+.gitignore
+.coverage
+htmlcov
