@@ -13,12 +13,12 @@ def test_from_dict_with_naming_changed():
         i: int
         f: float
 
-    result = from_dict(X, data={"s": "test", "k": 2, "j": 2.3}, schema={"i": "k", "f": "j"})
+    result = from_dict(X, data={"s": "test", "k": 2, "j": 2.3}, remap={"i": "k", "f": "j"})
 
     assert result == X(s="test", i=2, f=2.3)
 
 
-def test_from_dict_with_single_map_field_decorator_without_schema():
+def test_from_dict_with_single_map_field_decorator_without_remap():
     @dataclass
     @dacite.map_field("i", "k")
     class X:
@@ -30,7 +30,7 @@ def test_from_dict_with_single_map_field_decorator_without_schema():
     assert result == X(s="test", i=2)
 
 
-def test_from_dict_with_single_map_field_decorator_with_schema():
+def test_from_dict_with_single_map_field_decorator_with_remap():
     @dataclass
     @dacite.map_field("i", "k")
     class X:
@@ -38,7 +38,7 @@ def test_from_dict_with_single_map_field_decorator_with_schema():
         i: int
         f: float
 
-    result = from_dict(X, data={"s": "test", "k": 2, "j": 2.3}, schema={"f": "j"})
+    result = from_dict(X, data={"s": "test", "k": 2, "j": 2.3}, remap={"f": "j"})
 
     assert result == X(s="test", i=2, f=2.3)
 
@@ -113,7 +113,7 @@ def test_from_dict_with_nested_object_name_change():
     result = from_dict(
         X,
         data={"s": "testX", "k": 2, "j": {"l": 1, "y": {"x": "testY", "l": 3}}},
-        schema={"i": "k", "f": ("j.y", {"y": "l"})},
+        remap={"i": "k", "f": ("j.y", {"y": "l"})},
     )
 
     assert result == X(s="testX", i=2, f=Y("testY", 3))
@@ -140,23 +140,23 @@ def test_from_dict_with_deeply_nested_object():
     result = from_dict(
         X,
         data={"s": "testX", "k": 2, "j": {"l": 1, "y": {"l": 1, "y": {"x": "testY", "y": {"h": "testZ", "m": 2}}}}},
-        schema={"i": "k", "f": ("j.y.y", {"y": {"b": "m"}})},
+        remap={"i": "k", "f": ("j.y.y", {"y": {"b": "m"}})},
     )
 
     assert result == X(s="testX", i=2, f=Y(x="testY", y=Z(a="testZ", b=2)))
 
 
-def test_from_dict_with_simple_invalid_schema():
+def test_from_dict_with_simple_invalid_remap():
     @dataclass
     class X:
         s: str
         i: int
 
     with pytest.raises(ValueError) as exception_info:
-        from_dict(X, data={"s": "testX", "i": 3}, schema={"s": None})
+        from_dict(X, data={"s": "testX", "i": 3}, remap={"s": None})
 
     err = str(exception_info.value)
-    assert "invalid schema" in err and "X" in err and '"s"' in err and "None" in err
+    assert "invalid remap" in err and "X" in err and '"s"' in err and "None" in err
 
 
 def test_from_dict_with_invalid_scheme_nested():
@@ -171,7 +171,7 @@ def test_from_dict_with_invalid_scheme_nested():
         f: Y
 
     with pytest.raises(ValueError) as exception_info:
-        from_dict(X, data={"s": "testX", "f": {"x": 1, "m": 3}}, schema={"f": {"y", "m"}})
+        from_dict(X, data={"s": "testX", "f": {"x": 1, "m": 3}}, remap={"f": {"y", "m"}})
 
     err = str(exception_info.value)
-    assert "invalid schema" in err and "X" in err and '"f"' in err
+    assert "invalid remap" in err and "X" in err and '"f"' in err
