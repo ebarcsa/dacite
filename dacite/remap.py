@@ -30,6 +30,23 @@ def map_fields(remap: RemapMapping):
     return decorator
 
 
+def _try_keys(data, *keys):
+    for key in keys:
+        if key in data:
+            return data[key]
+    raise ValueError('Keys {} not found in : {}'.format(keys, data))
+
+
+def _follow_nested_keys(data, field_name, mapped_key):
+    orig_data = data
+    parts = mapped_key.split(".")
+    for part in parts:
+        if part not in data:
+            return _try_keys(orig_data, field_name, parts[0])
+        data = data[part]
+    return data
+
+
 def _get_mapped_data_and_remap(
     data_class: Type[T], field: Field, data: Data, remap: Optional[RemapMapping]
 ) -> Tuple[Any, Optional[RemapMapping]]:
@@ -40,12 +57,9 @@ def _get_mapped_data_and_remap(
     if remap is not None and field.name in remap:
         field_remap = remap[field.name]
         if isinstance(field_remap, str):
-            return data[field_remap], None
+            return _follow_nested_keys(data, field.name, field_remap), None
         if isinstance(field_remap, tuple):
-            parts = field_remap[0].split(".")
-            for part in parts:
-                data = data[part]
-            return data, field_remap[1]
+            return _follow_nested_keys(data, field.name, field_remap[0]), field_remap[1]
         if isinstance(field_remap, dict):
             return data[field.name], field_remap
         else:

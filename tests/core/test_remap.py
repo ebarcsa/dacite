@@ -175,3 +175,39 @@ def test_from_dict_with_invalid_scheme_nested():
 
     err = str(exception_info.value)
     assert "invalid remap" in err and "X" in err and '"f"' in err
+
+
+def test_from_dict_with_remap_decorator_ignored():
+    @dataclass
+    @dacite.map_field("i", "l")
+    class X:
+        s: str
+        i: int
+
+    result = from_dict(X, data={"s": "testX", "i": 3})
+    assert result == X("testX", 3)
+
+
+def test_from_dict_with_remap_nested_ignored():
+    @dataclass
+    @dacite.map_field("i", "l.p")
+    class X:
+        s: str
+        i: int
+
+    result = from_dict(X, data={"s": "testX", "i": 3})
+    assert result == X("testX", 3)
+
+
+def test_from_dict_with_remap_nested_key_not_found():
+    @dataclass
+    @dacite.map_field("i", "l.p")
+    class X:
+        s: str
+        i: int
+
+    with pytest.raises(ValueError) as exception_info:
+        from_dict(X, data={"s": "testX", "m": 3})
+
+    err = str(exception_info.value)
+    assert "Keys ('i', 'l') not found in : {'s': 'testX', 'm': 3}" == err
