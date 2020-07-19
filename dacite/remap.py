@@ -1,7 +1,9 @@
+import sys
 from dataclasses import Field
 from typing import TypeVar, Type, Optional, Mapping, Any, Union, Tuple
 
 from dacite.data import Data
+from dacite.exceptions import DaciteError
 
 T = TypeVar("T")
 
@@ -34,7 +36,9 @@ def _try_keys(data, *keys):
     for key in keys:
         if key in data:
             return data[key]
-    raise ValueError('Keys {} not found in : {}'.format(keys, data))
+    error = 'Keys {} not found in : {}'.format(keys, data)
+    print(error, file=sys.stderr)
+    raise DaciteError(error)
 
 
 def _follow_nested_keys(data, field_name, mapped_key):
@@ -63,5 +67,7 @@ def _get_mapped_data_and_remap(
         if isinstance(field_remap, dict):
             return data[field.name], field_remap
         else:
-            raise ValueError('Class {}, field "{}" has invalid remap: {}'.format(data_class, field.name, field_remap))
+            error = 'Class {}, field "{}" has invalid remap: {}'.format(data_class, field.name, field_remap)
+            print(error, file=sys.stderr)
+            raise DaciteError(error)
     return data[field.name], None
